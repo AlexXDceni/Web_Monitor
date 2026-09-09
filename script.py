@@ -1,5 +1,6 @@
 import hashlib
 import os
+from bs4 import BeautifulSoup
 import requests
 
 # --- CONFIGURARE ---
@@ -11,14 +12,11 @@ CHAT_ID = str(os.environ.get("CHAT_ID", "")).strip()
 
 
 def send_telegram_notification(text):
-    """Trimite notificarea către bot-ul de Telegram."""
     if not TELEGRAM_TOKEN or not CHAT_ID:
         print("Eroare: Lipsesc cheile TELEGRAM_TOKEN sau CHAT_ID în mediu!")
         return
 
-    # Endpoint-ul corect pentru Telegram Bot API
     telegram_url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-
     payload = {"chat_id": CHAT_ID, "text": text, "parse_mode": "Markdown"}
 
     try:
@@ -27,36 +25,42 @@ def send_telegram_notification(text):
             print("Succes: Notificarea a fost trimisă pe Telegram!")
         else:
             print(f"Serverul Telegram a răspuns cu codul: {response.status_code}")
-            print(f"Răspuns server: {response.text}")
     except Exception as e:
-        print(f"Trimiterea a eșuat. Eroare întâmpinată: {e}")
+        print(f"Trimiterea a eșuat. Eroare: {e}")
 
 
-def get_page_hash():
+def get_clean_page_hash():
     headers = {
         "User-Agent": (
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
             " (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         ),
-        "Accept": (
-            "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8"
-        ),
         "Accept-Language": "ro-RO,ro;q=0.9,en-US;q=0.8,en;q=0.7",
-        "Cache-Control": "max-age=0",
-        "Connection": "keep-alive",
     }
 
     session = requests.Session()
     response = session.get(URL, headers=headers, timeout=15)
     response.raise_for_status()
 
-    page_content = response.text.encode("utf-8")
-    return hashlib.sha256(page_content).hexdigest()
+    soup = BeautifulSoup(response.text, "html.parser")
+
+    # Eliminăm tag-urile dinamice care se schimbă la fiecare request
+    for tag in soup(["script", "style", "input", "meta", "noscript"]):
+        tag.decompose()
+
+    # Încercăm să izolăm doar zona principală de conținut
+    # Dacă site-ul folosește un tag <main> sau o clasă de conținut, o folosim pe aceea
+    main_content = soup.find("main") or soup.find("div", class_="content") or soup.body
+
+    # Extragerea doar a textului curățat de spații suplimentare
+    clean_text = main_content.get_text(separator=" ", strip=True)
+
+    return hashlib.sha256(clean_text.encode("utf-8")).hexdigest()
 
 
 def check_for_updates():
     try:
-        current_hash = get_page_hash()
+        current_hash = get_clean_page_hash()
     except requests.exceptions.HTTPError as e:
         print(f"Site-ul a blocat cererea: {e}")
         return
@@ -68,7 +72,7 @@ def check_for_updates():
 
     if current_hash != previous_hash:
         message = f"🚨 *Update detectat!*\nA apărut conținut nou la admiteri: {URL}"
-        print("[INFO] Schimbare detectată pe pagină. Se inițiază trimiterea...")
+        print("[INFO] Schimbare reală detectată pe pagină. Se trimite notificare...")
 
         send_telegram_notification(message)
 
