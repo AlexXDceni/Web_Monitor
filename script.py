@@ -44,19 +44,23 @@ def get_clean_page_hash():
 
     soup = BeautifulSoup(response.text, "html.parser")
 
-    # Eliminăm tag-urile dinamice care se schimbă la fiecare request
-    for tag in soup(["script", "style", "input", "meta", "noscript"]):
+    # Eliminăm toate tag-urile dinamice și neesențiale
+    for tag in soup(["script", "style", "input", "meta", "noscript", "form", "svg", "header", "footer", "nav"]):
         tag.decompose()
 
-    # Încercăm să izolăm doar zona principală de conținut
-    # Dacă site-ul folosește un tag <main> sau o clasă de conținut, o folosim pe aceea
-    main_content = soup.find("main") or soup.find("div", class_="content") or soup.body
+    # Căutăm container-ul specific al articolelor/anunțurilor
+    content_area = (
+        soup.find("div", class_="page-content")
+        or soup.find("div", class_="content")
+        or soup.find("main")
+        or soup.body
+    )
 
-    # Extragerea doar a textului curățat de spații suplimentare
-    clean_text = main_content.get_text(separator=" ", strip=True)
+    # Extragem doar liniile de text utile
+    lines = [line.strip() for line in content_area.get_text().splitlines() if line.strip()]
+    clean_text = "\n".join(lines)
 
     return hashlib.sha256(clean_text.encode("utf-8")).hexdigest()
-
 
 def check_for_updates():
     try:
