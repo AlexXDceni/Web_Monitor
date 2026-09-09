@@ -1,0 +1,35 @@
+name: Check Webpage Updates
+
+on:
+  schedule:
+    - cron: '0 * * * *' # Rulează automat la fiecare oră fixă. 
+  workflow_dispatch: # Îți permite să pornești scriptul și manual oricând vrei
+
+jobs:
+  run-script:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Run tracking script
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          CHAT_ID: ${{ secrets.CHAT_ID }}
+        run: python script.py
+
+      - name: Commit and push changes
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@://github.com'
+          git add last_hash.txt || true
+          git commit -m "Update page hash cache" || true
+          git push || true
