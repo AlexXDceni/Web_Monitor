@@ -3,10 +3,9 @@ import os
 import requests
 
 # --- CONFIGURARE ---
-URL = "https://vl.politiaromana.ro/ro/cariera/admitere-institutii-invatamant"  # Schimbă cu link-ul pe care vrei să îl urmărești
+URL = "https://vl.politiaromana.ro/ro/cariera/admitere-institutii-invatamant"
 HASH_FILE = "last_hash.txt"
 
-# Preluăm token-urile în siguranță din GitHub Environment
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
 CHAT_ID = os.environ.get("CHAT_ID")
 
@@ -27,17 +26,35 @@ def send_telegram_notification(text):
 
 
 def get_page_hash():
+  # Setăm Headere avansate pentru a păcăli sistemul de protecție al site-ului
   headers = {
-      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+      "User-Agent": (
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+          " (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+      ),
+      "Accept": (
+          "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8"
+      ),
+      "Accept-Language": "ro-RO,ro;q=0.9,en-US;q=0.8,en;q=0.7",
+      "Cache-Control": "max-age=0",
+      "Connection": "keep-alive",
   }
-  response = requests.get(URL, headers=headers)
+
+  # Creăm o sesiune pentru a păstra cookie-urile oferite de site
+  session = requests.Session()
+  response = session.get(URL, headers=headers, timeout=15)
   response.raise_for_status()
+
   page_content = response.text.encode("utf-8")
   return hashlib.sha256(page_content).hexdigest()
 
 
 def check_for_updates():
-  current_hash = get_page_hash()
+  try:
+    current_hash = get_page_hash()
+  except requests.exceptions.HTTPError as e:
+    print(f"Site-ul a blocat cererea: {e}")
+    return
 
   previous_hash = None
   if os.path.exists(HASH_FILE):
@@ -45,7 +62,7 @@ def check_for_updates():
       previous_hash = f.read().strip()
 
   if current_hash != previous_hash:
-    message = f"🚨 *Update detectat!*\nA apărut conținut nou la: {URL}"
+    message = f"🚨 *Update detectat!*\nA apărut conținut nou la admiteri: {URL}"
     print(message)
 
     send_telegram_notification(message)
