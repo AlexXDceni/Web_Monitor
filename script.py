@@ -6,8 +6,9 @@ import requests
 URL = "https://vl.politiaromana.ro/ro/cariera/admitere-institutii-invatamant"
 HASH_FILE = "last_hash.txt"
 
-TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
-CHAT_ID = os.environ.get("CHAT_ID")
+# Curățăm automat eventualele spații adăugate din greșeală în GitHub Secrets
+TELEGRAM_TOKEN = str(os.environ.get("TELEGRAM_TOKEN", "")).strip()
+CHAT_ID = str(os.environ.get("CHAT_ID", "")).strip()
 
 
 def send_telegram_notification(text):
@@ -16,17 +17,25 @@ def send_telegram_notification(text):
     print("Eroare: Lipsesc cheile TELEGRAM_TOKEN sau CHAT_ID în mediu!")
     return
 
+  # Construim URL-ul complet direct, folosind formatarea securizată din requests
   telegram_url = f"https://telegram.org{TELEGRAM_TOKEN}/sendMessage"
+
   payload = {"chat_id": CHAT_ID, "text": text, "parse_mode": "Markdown"}
+
+  print(
+      f"Se încearcă trimiterea către bot-ul cu token-ul care începe cu:"
+      f" {TELEGRAM_TOKEN[:10]}..."
+  )
+
   try:
-    response = requests.post(telegram_url, data=payload)
+    response = requests.post(telegram_url, data=payload, timeout=15)
     response.raise_for_status()
+    print("Notificarea a fost trimisă cu succes pe Telegram!")
   except requests.exceptions.RequestException as e:
     print(f"Eroare la trimiterea notificării: {e}")
 
 
 def get_page_hash():
-  # Setăm Headere avansate pentru a păcăli sistemul de protecție al site-ului
   headers = {
       "User-Agent": (
           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
@@ -40,7 +49,6 @@ def get_page_hash():
       "Connection": "keep-alive",
   }
 
-  # Creăm o sesiune pentru a păstra cookie-urile oferite de site
   session = requests.Session()
   response = session.get(URL, headers=headers, timeout=15)
   response.raise_for_status()
