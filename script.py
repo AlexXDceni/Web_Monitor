@@ -44,23 +44,15 @@ def get_clean_page_hash():
 
     soup = BeautifulSoup(response.text, "html.parser")
 
-    # Eliminăm toate tag-urile dinamice și neesențiale
-    for tag in soup(["script", "style", "input", "meta", "noscript", "form", "svg", "header", "footer", "nav"]):
+    # Eliminăm complet tag-urile unde se schimbă token-urile dinamice
+    for tag in soup(["script", "style", "input", "meta", "noscript", "form", "svg"]):
         tag.decompose()
 
-    # Căutăm container-ul specific al articolelor/anunțurilor
-    content_area = (
-        soup.find("div", class_="page-content")
-        or soup.find("div", class_="content")
-        or soup.find("main")
-        or soup.body
-    )
-
-    # Extragem doar liniile de text utile
-    lines = [line.strip() for line in content_area.get_text().splitlines() if line.strip()]
-    clean_text = "\n".join(lines)
+    # Extragem doar textul vizibil curățat
+    clean_text = soup.get_text(separator=" ", strip=True)
 
     return hashlib.sha256(clean_text.encode("utf-8")).hexdigest()
+
 
 def check_for_updates():
     try:
@@ -76,7 +68,7 @@ def check_for_updates():
 
     if current_hash != previous_hash:
         message = f"🚨 *Update detectat!*\nA apărut conținut nou la admiteri: {URL}"
-        print("[INFO] Schimbare reală detectată pe pagină. Se trimite notificare...")
+        print("[INFO] Schimbare detectată pe pagină. Se trimite notificare...")
 
         send_telegram_notification(message)
 
