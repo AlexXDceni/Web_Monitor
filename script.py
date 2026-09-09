@@ -29,7 +29,7 @@ def send_telegram_notification(text):
         print(f"Trimiterea a eșuat. Eroare: {e}")
 
 
-def get_clean_page_hash():
+def get_latest_announcement_hash():
     headers = {
         "User-Agent": (
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
@@ -44,19 +44,40 @@ def get_clean_page_hash():
 
     soup = BeautifulSoup(response.text, "html.parser")
 
-    # Eliminăm complet tag-urile unde se schimbă token-urile dinamice
+    # Eliminăm elementele inutile din pagină
     for tag in soup(["script", "style", "input", "meta", "noscript", "form", "svg"]):
         tag.decompose()
 
-    # Extragem doar textul vizibil curățat
-    clean_text = soup.get_text(separator=" ", strip=True)
+    # Identificăm link-urile care conțin anunțuri (butoanele/titlurile cu 'Citește tot' sau titlurile albastre)
+    # Paginile CMS de tipul acesta au anunțurile structurate în blocuri distincte
+    announcements = []
 
-    return hashlib.sha256(clean_text.encode("utf-8")).hexdigest()
+    # Căutăm toate container-ele sau titlurile de anunțuri
+    for article in soup.find_all(["div", "article"]):
+        # Dacă găsim o zonă de text care conține o dată (ex: "03 Septembrie 2026") și un titlu
+        text = article.get_text(strip=True)
+        if "Sursa:" in text or "Citește tot" in text:
+            announcements.append(text)
+
+    if announcements:
+        # Luăm doar primul anunț (cel mai recent de sus)
+        latest_announcement = announcements[0]
+    else:
+        # Fallback: extragem primele 3 titluri și link-uri din pagină
+        links = soup.find_all("a", href=True)
+        relevant_links = [
+            f"{l.get_text(strip=True)}|{l['href']}"
+            for l in links
+            if "admitere" in l["href"] or "Citește" in l.get_text()
+        ]
+        latest_announcement = "".join(relevant_links[:3])
+
+    return hashlib.sha256(latest_announcement.encode("utf-8")).hexdigest()
 
 
 def check_for_updates():
     try:
-        current_hash = get_clean_page_hash()
+        current_hash = get_latest_announcement_hash()
     except requests.exceptions.HTTPError as e:
         print(f"Site-ul a blocat cererea: {e}")
         return
@@ -67,15 +88,15 @@ def check_for_updates():
             previous_hash = f.read().strip()
 
     if current_hash != previous_hash:
-        message = f"🚨 *Update detectat!*\nA apărut conținut nou la admiteri: {URL}"
-        print("[INFO] Schimbare detectată pe pagină. Se trimite notificare...")
+        message = f"🚨 *Anunț nou la admiteri!*\nVerifică pagina: {URL}"
+        print("[INFO] Anunț nou detectat. Se trimite notificare pe Telegram...")
 
         send_telegram_notification(message)
 
         with open(HASH_FILE, "w") as f:
             f.write(current_hash)
     else:
-        print("Nu s-a schimbat nimic.")
+        print("Nu s-a adăugat niciun anunț nou.")
 
 
 if __name__ == "__main__":
