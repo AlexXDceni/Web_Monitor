@@ -43,36 +43,17 @@ def get_latest_announcement_hash():
     response.raise_for_status()
 
     soup = BeautifulSoup(response.text, "html.parser")
+    # soup = soup.prettify()
 
-    # Eliminăm elementele inutile din pagină
-    for tag in soup(["script", "style", "input", "meta", "noscript", "form", "svg"]):
-        tag.decompose()
+    stiri_blocks = soup.find_all("div", class_="boxStire")
 
-    # Identificăm link-urile care conțin anunțuri (butoanele/titlurile cu 'Citește tot' sau titlurile albastre)
-    # Paginile CMS de tipul acesta au anunțurile structurate în blocuri distincte
-    announcements = []
+    ultima_stire = stiri_blocks[0]
+    data_stire = ultima_stire.find("span", class_="dataStire").text.strip()
 
-    # Căutăm toate container-ele sau titlurile de anunțuri
-    for article in soup.find_all(["div", "article"]):
-        # Dacă găsim o zonă de text care conține o dată (ex: "03 Septembrie 2026") și un titlu
-        text = article.get_text(strip=True)
-        if "Sursa:" in text or "Citește tot" in text:
-            announcements.append(text)
+    final_soup = data_stire
 
-    if announcements:
-        # Luăm doar primul anunț (cel mai recent de sus)
-        latest_announcement = announcements[0]
-    else:
-        # Fallback: extragem primele 3 titluri și link-uri din pagină
-        links = soup.find_all("a", href=True)
-        relevant_links = [
-            f"{l.get_text(strip=True)}|{l['href']}"
-            for l in links
-            if "admitere" in l["href"] or "Citește" in l.get_text()
-        ]
-        latest_announcement = "".join(relevant_links[:3])
+    return hashlib.sha256(final_soup.encode("utf-8")).hexdigest()
 
-    return hashlib.sha256(latest_announcement.encode("utf-8")).hexdigest()
 
 
 def check_for_updates():
