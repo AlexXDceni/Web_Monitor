@@ -5,15 +5,22 @@ import requests
 
 # --- CONFIGURARE ---
 URL = "https://vl.politiaromana.ro/ro/cariera/admitere-institutii-invatamant"
-HASH_FILE = "last_hash.txt"
 
+FIRST_HTML_TAG = "div"
+FIRST_HTML_CLASS = "boxStire"
+SECOND_HTML_TAG = "span"
+SECOND_HTML_CLASS = "dataStire"
+
+
+
+HASH_FILE = "last_hash.txt"
 TELEGRAM_TOKEN = str(os.environ.get("TELEGRAM_TOKEN", "")).strip()
 CHAT_ID = str(os.environ.get("CHAT_ID", "")).strip()
 
 
 def send_telegram_notification(text):
     if not TELEGRAM_TOKEN or not CHAT_ID:
-        print("Eroare: Lipsesc cheile TELEGRAM_TOKEN sau CHAT_ID în mediu!")
+        print("Error: TELEGRAM_TOKEN or CHAT_ID is missing!")
         return
 
     telegram_url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
@@ -22,12 +29,11 @@ def send_telegram_notification(text):
     try:
         response = requests.post(telegram_url, json=payload, timeout=15)
         if response.status_code == 200:
-            print("Succes: Notificarea a fost trimisă pe Telegram!")
+            print("Success: The notification has been sent to Telegram!")
         else:
-            print(f"Serverul Telegram a răspuns cu codul: {response.status_code}")
+            print(f"Telegram server responded with code: {response.status_code}")
     except Exception as e:
-        print(f"Trimiterea a eșuat. Eroare: {e}")
-
+        print(f"Failed to send notification. Error: {e}")
 
 def get_latest_announcement_hash():
     headers = {
@@ -45,22 +51,17 @@ def get_latest_announcement_hash():
     soup = BeautifulSoup(response.text, "html.parser")
     # soup = soup.prettify()
 
-    stiri_blocks = soup.find_all("div", class_="boxStire")
+    blocks = soup.find_all(FIRST_HTML_TAG, class_=FIRST_HTML_CLASS)
 
-    ultima_stire = stiri_blocks[0]
-    data_stire = ultima_stire.find("span", class_="dataStire").text.strip()
-
-    final_soup = data_stire
+    final_soup = blocks[0].find(SECOND_HTML_TAG, class_=SECOND_HTML_CLASS).text.strip()
 
     return hashlib.sha256(final_soup.encode("utf-8")).hexdigest()
-
-
 
 def check_for_updates():
     try:
         current_hash = get_latest_announcement_hash()
     except requests.exceptions.HTTPError as e:
-        print(f"Site-ul a blocat cererea: {e}")
+        print(f"The website has blocked the request: {e}")
         return
 
     previous_hash = None
@@ -69,16 +70,15 @@ def check_for_updates():
             previous_hash = f.read().strip()
 
     if current_hash != previous_hash:
-        message = f"🚨 *Anunț nou la admiteri!*\nVerifică pagina: {URL}"
-        print("[INFO] Anunț nou detectat. Se trimite notificare pe Telegram...")
+        message = f"🚨 *New Announcement!*\nCheck page: {URL}"
+        print("[INFO] Change detected. Sending notification to Telegram...")
 
         send_telegram_notification(message)
 
         with open(HASH_FILE, "w") as f:
             f.write(current_hash)
     else:
-        print("Nu s-a adăugat niciun anunț nou.")
-
+        print("No new announcement added.")
 
 if __name__ == "__main__":
     check_for_updates()
