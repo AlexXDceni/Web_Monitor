@@ -33,14 +33,11 @@ jobs:
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
           
-          # Adăugăm fișierul în staging area
           git add last_hash.txt
           
-          # Verificăm dacă fișierul s-a schimbat cu adevărat
           if ! git diff --cached --quiet; then
             git commit -m "Update page hash cache"
-            # Facem push direct pe branch-ul care a declanșat acțiunea
             git push origin HEAD:${{ github.ref_name }}
           else
-            echo "Nu s-a detectat nicio schimbare în last_hash.txt. Skip push."
+            echo "No change detected in last_hash.txt. Skip push."
           fi
