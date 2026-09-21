@@ -27,7 +27,7 @@ def send_telegram_notification(text):
     payload = {"chat_id": CHAT_ID, "text": text, "parse_mode": "Markdown"}
 
     try:
-        response = requests.post(telegram_url, json=payload, timeout=15)
+        response = requests.post(telegram_url, json=payload, timeout=15, verify=False)
         if response.status_code == 200:
             print("Success: The notification has been sent to Telegram!")
         else:
