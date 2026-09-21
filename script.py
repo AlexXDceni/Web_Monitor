@@ -27,7 +27,7 @@ def send_telegram_notification(text):
     payload = {"chat_id": CHAT_ID, "text": text, "parse_mode": "Markdown"}
 
     try:
-        response = requests.post(telegram_url, json=payload, timeout=15, verify=False)
+        response = requests.post(telegram_url, json=payload, timeout=15)
         if response.status_code == 200:
             print("Success: The notification has been sent to Telegram!")
         else:
@@ -45,7 +45,7 @@ def get_latest_announcement_hash():
     }
 
     session = requests.Session()
-    response = session.get(URL, headers=headers, timeout=15)
+    response = session.get(URL, headers=headers, timeout=15, verify=False)
     response.raise_for_status()
 
     soup = BeautifulSoup(response.text, "html.parser")
