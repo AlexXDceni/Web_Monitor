@@ -45,7 +45,7 @@ def get_latest_announcement_hash():
     }
 
     session = requests.Session()
-    response = session.get(URL, headers=headers, timeout=15)
+    response = session.get(URL, headers=headers, timeout=15, verify=False)
     response.raise_for_status()
 
     soup = BeautifulSoup(response.text, "html.parser")
