@@ -1,3 +1,4 @@
+from datetime import datetime
 import hashlib
 import os
 from bs4 import BeautifulSoup
@@ -29,7 +30,19 @@ def send_telegram_notification(text):
         return
 
     telegram_url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-    payload = {"chat_id": CHAT_ID, "text": text, "parse_mode": "MarkdownV2"}
+
+    inline_keyboard = {
+        "inline_keyboard": [
+            [
+                {
+                    "text": "🌐 Open Website",
+                    "url": URL
+                }
+            ]
+        ]
+    }
+
+    payload = {"chat_id": CHAT_ID, "text": text, "parse_mode": "HTML", "reply_markup": inline_keyboard}
 
     try:
         response = requests.post(telegram_url, json=payload, timeout=15)
@@ -86,7 +99,17 @@ def check_for_updates():
 
     if current_hash != previous_hash:
         # message = f"🚨 *New Announcement!*\nCheck page: {URL}"
-        message = f"╔════════════════════╗\n🚨  *NEW ANNOUNCEMENT*  🚨\n╚════════════════════╝\n\n📌 *Status:* Change detected\\!\n🔗 *Check link:* `{URL}`"
+
+        time = datetime.now().strftime("%d %B %Y, %H:%M")
+        message = (
+            "╔════════════════════╗\n"
+            "🚨  <b>NEW ANNOUNCEMENT</b>  🚨\n"
+            "╚════════════════════╝\n\n"
+            "📌 <b>Status:</b> Change detected!\n"
+            f"⏰ <b>Verified at:</b> <code>{time}</code>\n\n"
+            "🔗 <i>Click here to view the announcement.</i>"
+        )
+
         print("[INFO] Change detected. Sending notification to Telegram...")
 
         send_telegram_notification(message)
