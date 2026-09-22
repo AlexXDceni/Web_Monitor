@@ -3,6 +3,11 @@ import os
 from bs4 import BeautifulSoup
 import requests
 
+
+# SSL/TTL verif error ignoring
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
 # --- CONFIGURARE ---
 URL = "https://vl.politiaromana.ro/ro/cariera/admitere-institutii-invatamant"
 
