@@ -29,7 +29,7 @@ def send_telegram_notification(text):
         return
 
     telegram_url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-    payload = {"chat_id": CHAT_ID, "text": text, "parse_mode": "Markdown"}
+    payload = {"chat_id": CHAT_ID, "text": text, "parse_mode": "MarkdownV2"}
 
     try:
         response = requests.post(telegram_url, json=payload, timeout=15)
@@ -85,7 +85,8 @@ def check_for_updates():
             previous_hash = f.read().strip()
 
     if current_hash != previous_hash:
-        message = f"🚨 *New Announcement!*\nCheck page: {URL}"
+        # message = f"🚨 *New Announcement!*\nCheck page: {URL}"
+        message = f"╔════════════════════╗\n🚨  *NEW ANNOUNCEMENT*  🚨\n╚════════════════════╝\n\n📌 *Status:* Change detected\\!\n🔗 *Check link:* `{URL}`"
         print("[INFO] Change detected. Sending notification to Telegram...")
 
         send_telegram_notification(message)
