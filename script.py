@@ -60,9 +60,19 @@ def get_latest_announcement_hash():
 def check_for_updates():
     try:
         current_hash = get_latest_announcement_hash()
+    except requests.exceptions.Timeout:
+        print(f"The request timed out.")
+        return
     except requests.exceptions.HTTPError as e:
         print(f"The website has blocked the request: {e}")
         return
+    except requests.exceptions.ConnectionError as e:
+        print(f"Connection/DNS error: {e}")
+        return
+    except requests.exceptions.RequestException as e:
+        print(f"Unexpected error occurred: {e}")
+        return
+
 
     previous_hash = None
     if os.path.exists(HASH_FILE):
