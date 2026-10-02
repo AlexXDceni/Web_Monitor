@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 import hashlib
 import os
 from bs4 import BeautifulSoup
@@ -100,7 +100,7 @@ def check_for_updates():
     if current_hash != previous_hash:
         # message = f"🚨 *New Announcement!*\nCheck page: {URL}"
 
-        time = datetime.now().strftime("%d %B %Y, %H:%M")
+        time = (datetime.now()-timedelta(hours=3)).strftime("%d %B %Y, %H:%M")
         message = (
             "╔════════════════════╗\n"
             "🚨  <b>NEW ANNOUNCEMENT</b>  🚨\n"
