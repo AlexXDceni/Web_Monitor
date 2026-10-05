@@ -20,12 +20,12 @@ SECOND_HTML_CLASS = "dataStire"
 THIRD_HTML_TAG = "h3"
 FORTH_HTML_TAG = "a"
 
-HASH_FILE = "last_hash.txt"
+PROCESSED_HASHES_FILE = "processed_hashes.txt"
 TELEGRAM_TOKEN = str(os.environ.get("TELEGRAM_TOKEN", "")).strip()
 CHAT_ID = str(os.environ.get("CHAT_ID", "")).strip()
 
 
-def send_telegram_notification(text, announcement_url):
+def send_telegram_notification(text, url, announcement_url):
     if not TELEGRAM_TOKEN or not CHAT_ID:
         print("Error: TELEGRAM_TOKEN or CHAT_ID is missing!")
         return
@@ -41,7 +41,7 @@ def send_telegram_notification(text, announcement_url):
                 },
                 {
                     "text": "🌐 Open Main Page",
-                    "url": URL
+                    "url": url
                 }
             ]
         ]
@@ -65,7 +65,23 @@ def send_telegram_notification(text, announcement_url):
         print(f"Failed to send notification. Error: {e}")
 
 
-def get_latest_announcement_data():
+def load_processed_hashes():
+    """Încarcă toate hash-urile salvate anterior dintr-un fișier."""
+    if os.path.exists(PROCESSED_HASHES_FILE):
+        with open(PROCESSED_HASHES_FILE, "r", encoding="utf-8") as f:
+            return set(line.strip() for line in f if line.strip())
+    return set()
+
+
+def save_processed_hashes(hashes):
+    """Salvează setul de hash-uri în fișier (păstrează ultimele 100 pentru a preveni creșterea nelimitată)."""
+    recent_hashes = list(hashes)[-100:]
+    with open(PROCESSED_HASHES_FILE, "w", encoding="utf-8") as f:
+        for h in recent_hashes:
+            f.write(f"{h}\n")
+
+
+def get_all_announcements():
     headers = {
         "User-Agent": (
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
@@ -84,30 +100,39 @@ def get_latest_announcement_data():
     if not blocks:
         raise ValueError("No announcement blocks found on the page.")
 
-    first_block = blocks[0]
+    announcements = []
 
-    date_soup = first_block.find(SECOND_HTML_TAG, class_=SECOND_HTML_CLASS).text.strip()
-    
-    title_element = first_block.find(THIRD_HTML_TAG)
-    title_soup = title_element.text.strip() if title_element else "No title"
+    for block in blocks:
+        date_soup = block.find(SECOND_HTML_TAG, class_=SECOND_HTML_CLASS).text.strip()
 
-    link_element = title_element.find(FORTH_HTML_TAG) if title_element else None
-    raw_link = link_element.get("href", "").strip() if link_element else ""
+        title_element = block.find(THIRD_HTML_TAG)
+        title_soup = title_element.text.strip() if title_element else "No title"
 
-    if raw_link.startswith("http"):
-        link_soup = raw_link
-    else:
-        link_soup = f"https://vl.politiaromana.ro{raw_link}"
+        link_element = title_element.find(FORTH_HTML_TAG) if title_element else None
+        raw_link = link_element.get("href", "").strip() if link_element else ""
 
-    hash_content = f"{date_soup}_{title_soup}"
-    current_hash = hashlib.sha256(hash_content.encode("utf-8")).hexdigest()
+        if raw_link.startswith("http"):
+            link_soup = raw_link
+        else:
+            link_soup = f"https://vl.politiaromana.ro{raw_link}"
 
-    return current_hash, title_soup, date_soup, link_soup
+        # Hash unic bazat pe titlu și dată
+        hash_content = f"{date_soup}_{title_soup}"
+        item_hash = hashlib.sha256(hash_content.encode("utf-8")).hexdigest()
+
+        announcements.append({
+            "hash": item_hash,
+            "title": title_soup,
+            "date": date_soup,
+            "link": link_soup
+        })
+
+    return announcements
 
 
 def check_for_updates():
     try:
-        current_hash, title, announcement_date, link = get_latest_announcement_data()
+        announcements = get_all_announcements()
     except requests.exceptions.Timeout:
         print("The request timed out.")
         return
@@ -124,33 +149,43 @@ def check_for_updates():
         print(f"Parsing error: {e}")
         return
 
-    previous_hash = None
-    if os.path.exists(HASH_FILE):
-        with open(HASH_FILE, "r", encoding="utf-8") as f:
-            previous_hash = f.read().strip()
+    processed_hashes = load_processed_hashes()
 
-    if current_hash != previous_hash:
-        time = (datetime.now() + timedelta(hours=3)).strftime("%d %B %Y, %H:%M")
+    # Daca fisierul este gol (prima rulare), salvăm anunțurile curente fără a trimite spam
+    if not processed_hashes:
+        print("[INFO] First run detected. Saving current announcements as baseline...")
+        for item in announcements:
+            processed_hashes.add(item["hash"])
+        save_processed_hashes(processed_hashes)
+        return
 
-        safe_title = html.escape(title)
-        safe_date = html.escape(announcement_date)
+    # Inversăm lista pentru a procesa anunțurile de la cel mai vechi la cel mai nou
+    new_announcements = [item for item in reversed(announcements) if item["hash"] not in processed_hashes]
 
-        message = (
-            "╔════════════════════╗\n"
-            "🚨  <b>NEW ANNOUNCEMENT</b>  🚨\n"
-            "╚════════════════════╝\n\n"
-            f"📌 <b>Title:</b> {safe_title}\n"
-            f"📅 <b>Publication Date:</b> {safe_date}\n"
-            f"⏰ <b>Checked at:</b> <code>{time}</code>\n\n"
-            "🔗 <i>Use the buttons below for more details.</i>"
-        )
+    if new_announcements:
+        print(f"[INFO] Found {len(new_announcements)} new announcement(s)!")
 
-        print("[INFO] Change detected. Sending notification to Telegram...")
+        time_now = (datetime.now() + timedelta(hours=3)).strftime("%d %B %Y, %H:%M")
 
-        send_telegram_notification(message, link)
+        for item in new_announcements:
+            safe_title = html.escape(item["title"])
+            safe_date = html.escape(item["date"])
 
-        with open(HASH_FILE, "w", encoding="utf-8") as f:
-            f.write(current_hash)
+            message = (
+                "╔════════════════════╗\n"
+                "🚨  <b>NEW ANNOUNCEMENT</b>  🚨\n"
+                "╚════════════════════╝\n\n"
+                f"📌 <b>Title:</b> {safe_title}\n"
+                f"📅 <b>Publication Date:</b> {safe_date}\n"
+                f"⏰ <b>Checked at:</b> <code>{time_now}</code>\n\n"
+                "🔗 <i>Use the buttons below for more details.</i>"
+            )
+
+            send_telegram_notification(message, URL, item["link"])
+            processed_hashes.add(item["hash"])
+
+        # Salvează lista actualizată de hash-uri
+        save_processed_hashes(processed_hashes)
     else:
         print("No new announcement added.")
 
