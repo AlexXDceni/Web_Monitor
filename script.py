@@ -20,7 +20,7 @@ SECOND_HTML_CLASS = "dataStire"
 THIRD_HTML_TAG = "h3"
 FORTH_HTML_TAG = "a"
 
-PROCESSED_HASHES_FILE = "processed_hashes.txt"
+PROCESSED_HASHES_FILE = "last_hash.txt"
 TELEGRAM_TOKEN = str(os.environ.get("TELEGRAM_TOKEN", "")).strip()
 CHAT_ID = str(os.environ.get("CHAT_ID", "")).strip()
 
